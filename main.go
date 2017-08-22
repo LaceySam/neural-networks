@@ -29,8 +29,8 @@ type NeuralNetwork struct {
 	InputCount                   int
 	OutputCount                  int
 	LossFunction                 LossFunction
-	CompressionMean              float64
-	CompressionStandardDeviation float64
+	CompressionMean              *mat.Dense
+	CompressionStandardDeviation *mat.Dense
 	BatchSize                    int
 	DataSet                      *DataSet
 }
@@ -107,7 +107,6 @@ func (nn *NeuralNetwork) Forward(X *mat.Dense) (*mat.Dense, error) {
 
 		r, c := X.Dims()
 		fmt.Printf("BATCH: ROWS: %d, COLS: %d\n", r, c)
-
 	}
 
 	return X, nil
@@ -145,6 +144,7 @@ func (nn *NeuralNetwork) LoadData(batchSize int, data []byte) error {
 	}
 
 	nn.DataSet.Setup(batchSize)
+	nn.CompressionMean, nn.CompressionStandardDeviation = nn.DataSet.Compress()
 	return nil
 }
 

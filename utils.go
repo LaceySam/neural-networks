@@ -50,3 +50,23 @@ func AddRowToMatrix(matrix, row *mat.Dense) (*mat.Dense, error) {
 
 	return mat.NewDense(matrixRows, matrixCols, result), nil
 }
+
+func GetColumnMean(x *mat.Dense) (*mat.VecDense, error) {
+	rows, cols := x.Dims()
+	colMeans := []float64{}
+	for i := 0; i < cols; i++ {
+		mean := 0
+		column := x.ColView(i)
+		for j := 0; j <= rows; j++ {
+			mean = mean + column.At(i, j)
+		}
+
+		colMeans = append(colMeans, mean)
+	}
+
+	return mat.NewVecDense(len(colMeans), colMeans)
+}
+
+func CalculateColumnStdDev(x *mat.Dense) (*mat.Dense, error) {
+	rows, cols := x.Dims()
+}

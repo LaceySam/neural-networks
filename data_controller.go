@@ -30,6 +30,9 @@ func (d *DataSet) Setup(BatchSize int) {
 	d.OutputCount = len(d.Output[0])
 }
 
+func (d *DataSet) Compress() (float64, float64) {
+}
+
 func (d *DataSet) Reset() {
 	d.currentLocation = 0
 }
