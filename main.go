@@ -9,11 +9,6 @@ import (
 	"gonum.org/v1/gonum/mat"
 )
 
-type Data struct {
-	Input  [][]float64 `json:"input"`
-	Output [][]float64 `json:"output"`
-}
-
 type Layer struct {
 	Weight             *mat.Dense
 	Bias               *mat.Dense
@@ -28,20 +23,26 @@ func (l *Layer) Seed() {
 }
 
 type NeuralNetwork struct {
-	HiddenLayerCount int
-	HiddenLayerSize  int
-	Layers           []*Layer
-	InputCount       int
-	OutputCount      int
-	LossFunction     LossFunction
+	HiddenLayerCount             int
+	HiddenLayerSize              int
+	Layers                       []*Layer
+	InputCount                   int
+	OutputCount                  int
+	LossFunction                 LossFunction
+	CompressionMean              float64
+	CompressionStandardDeviation float64
+	BatchSize                    int
+	DataSet                      *DataSet
 }
 
-func NewNeuralNetwork(hiddenLayerCount, hiddenLayerSize, inputCount, outputCount int, lossFunction LossFunction) *NeuralNetwork {
+func NewNeuralNetwork(
+	hiddenLayerCount int,
+	hiddenLayerSize int,
+	lossFunction LossFunction,
+) *NeuralNetwork {
 	return &NeuralNetwork{
 		HiddenLayerCount: hiddenLayerCount,
 		HiddenLayerSize:  hiddenLayerSize,
-		InputCount:       inputCount,
-		OutputCount:      outputCount,
 		Layers:           []*Layer{},
 		LossFunction:     lossFunction,
 	}
@@ -57,12 +58,12 @@ func (
 	var r, c int
 	if len(nn.Layers) == 0 {
 		// Input layer
-		r = nn.InputCount
+		r = nn.DataSet.InputCount
 		c = nn.HiddenLayerSize
 	} else if len(nn.Layers) == nn.HiddenLayerCount+1 {
 		// Output layer
 		r = nn.HiddenLayerSize
-		c = nn.OutputCount
+		c = nn.DataSet.OutputCount
 	} else if len(nn.Layers) > nn.HiddenLayerCount+1 {
 		// Neural network already built...maybe panic instead?
 		return false
@@ -120,6 +121,33 @@ func (nn *NeuralNetwork) TrainBatch(X, y *mat.Dense) error {
 	return nil
 }
 
+func (nn *NeuralNetwork) TrainEpochs(epochs int) error {
+
+	for i := 0; i < epochs; i++ {
+		for !nn.DataSet.Completed() {
+			X, y := nn.DataSet.GetBatch()
+
+			err := nn.TrainBatch(X, y)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (nn *NeuralNetwork) LoadData(batchSize int, data []byte) error {
+	nn.DataSet = &DataSet{}
+	err := json.Unmarshal(data, nn.DataSet)
+	if err != nil {
+		return err
+	}
+
+	nn.DataSet.Setup(batchSize)
+	return nil
+}
+
 func main() {
 
 	file, e := ioutil.ReadFile("./data.json")
@@ -128,22 +156,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	data := &Data{}
-	json.Unmarshal(file, data)
-
 	hiddenLayers := 4
 	hiddenLayerSize := 30
-	inputCount := 7
-	outputCount := 3
-	nn := NewNeuralNetwork(hiddenLayers, hiddenLayerSize, inputCount, outputCount, L2Loss)
+	batchSize := 27
+	nn := NewNeuralNetwork(hiddenLayers, hiddenLayerSize, L2Loss)
+	nn.LoadData(batchSize, file)
 
 	o := NewOnes()
 	for i := 0; i < hiddenLayers+2; i++ {
 		var g *GlorotNormal
 		if i == 0 {
-			g = NewGlorotNormal(inputCount, hiddenLayerSize)
+			g = NewGlorotNormal(nn.DataSet.InputCount, hiddenLayerSize)
 		} else if i == (hiddenLayers + 1) {
-			g = NewGlorotNormal(hiddenLayerSize, outputCount)
+			g = NewGlorotNormal(hiddenLayerSize, nn.DataSet.OutputCount)
 		} else {
 			g = NewGlorotNormal(hiddenLayerSize, hiddenLayerSize)
 		}
@@ -151,29 +176,5 @@ func main() {
 		nn.AddDenseLayer(Relu, g, o)
 	}
 
-	slice := data.Input[0:10]
-	ySlice := data.Output[0:10]
-	batchItems := []float64{}
-	yItems := []float64{}
-
-	for _, example := range slice {
-		for _, i := range example {
-			batchItems = append(batchItems, i)
-		}
-	}
-
-	for _, example := range ySlice {
-		for _, i := range example {
-			yItems = append(yItems, i)
-		}
-	}
-
-	batch := mat.NewDense(len(slice), inputCount, batchItems)
-	y := mat.NewDense(len(ySlice), outputCount, yItems)
-	r, c := batch.Dims()
-	fmt.Printf("X: ROWS: %d, COLS: %d\n", r, c)
-	r, c = y.Dims()
-	fmt.Printf("y: ROWS: %d, COLS: %d\n", r, c)
-
-	_ = nn.TrainBatch(batch, y)
+	nn.TrainEpochs(1)
 }
