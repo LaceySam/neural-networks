@@ -33,15 +33,17 @@ type NeuralNetwork struct {
 	Layers           []*Layer
 	InputCount       int
 	OutputCount      int
+	LossFunction     LossFunction
 }
 
-func NewNeuralNetwork(hiddenLayerCount, hiddenLayerSize, inputCount, outputCount int) *NeuralNetwork {
+func NewNeuralNetwork(hiddenLayerCount, hiddenLayerSize, inputCount, outputCount int, lossFunction LossFunction) *NeuralNetwork {
 	return &NeuralNetwork{
 		HiddenLayerCount: hiddenLayerCount,
 		HiddenLayerSize:  hiddenLayerSize,
 		InputCount:       inputCount,
 		OutputCount:      outputCount,
 		Layers:           []*Layer{},
+		LossFunction:     lossFunction,
 	}
 }
 
@@ -85,27 +87,37 @@ func (
 	return true
 }
 
-func (nn *NeuralNetwork) Forward(data *mat.Dense) (*mat.Dense, error) {
+func (nn *NeuralNetwork) Forward(X *mat.Dense) (*mat.Dense, error) {
 
 	//var result *mat.Dense
 	var err error
 
 	for i := 0; i < len(nn.Layers); i++ {
 		layer := nn.Layers[i]
-		data, err = MultiplyMatrices(data, layer.Weight)
+		X, err = MultiplyMatrices(X, layer.Weight)
 		if err != nil {
 			return nil, err
 		}
 
-		data, err = AddRowToMatrix(data, layer.Bias)
+		X, err = AddRowToMatrix(X, layer.Bias)
 		if err != nil {
 			return nil, err
 		}
+
+		r, c := X.Dims()
+		fmt.Printf("BATCH: ROWS: %d, COLS: %d\n", r, c)
 
 	}
 
-	return data, nil
+	return X, nil
+}
 
+func (nn *NeuralNetwork) TrainBatch(X, y *mat.Dense) error {
+	X, _ = nn.Forward(X)
+	loss := nn.LossFunction(X, y)
+	fmt.Println("Loss", loss)
+
+	return nil
 }
 
 func main() {
@@ -123,7 +135,7 @@ func main() {
 	hiddenLayerSize := 30
 	inputCount := 7
 	outputCount := 3
-	nn := NewNeuralNetwork(hiddenLayers, hiddenLayerSize, inputCount, outputCount)
+	nn := NewNeuralNetwork(hiddenLayers, hiddenLayerSize, inputCount, outputCount, L2Loss)
 
 	o := NewOnes()
 	for i := 0; i < hiddenLayers+2; i++ {
@@ -140,17 +152,28 @@ func main() {
 	}
 
 	slice := data.Input[0:10]
+	ySlice := data.Output[0:10]
 	batchItems := []float64{}
+	yItems := []float64{}
+
 	for _, example := range slice {
 		for _, i := range example {
 			batchItems = append(batchItems, i)
 		}
 	}
 
-	batch := mat.NewDense(len(slice), inputCount, batchItems)
-	r, c := batch.Dims()
-	fmt.Printf("BATCH: ROWS: %d, COLS: %d\n", r, c)
+	for _, example := range ySlice {
+		for _, i := range example {
+			yItems = append(yItems, i)
+		}
+	}
 
-	x, _ := nn.Forward(batch)
-	fmt.Println(x)
+	batch := mat.NewDense(len(slice), inputCount, batchItems)
+	y := mat.NewDense(len(ySlice), outputCount, yItems)
+	r, c := batch.Dims()
+	fmt.Printf("X: ROWS: %d, COLS: %d\n", r, c)
+	r, c = y.Dims()
+	fmt.Printf("y: ROWS: %d, COLS: %d\n", r, c)
+
+	_ = nn.TrainBatch(batch, y)
 }
