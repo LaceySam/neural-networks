@@ -48,12 +48,12 @@ func (d *DataSet) createBatches() (*mat.VecDense, *mat.VecDense) {
 
 	// Compress
 	xCompressionMean := GetColumnMean(input)
-	d.input, _ = SubtractColumnVector(input, xCompressionMean)
+	d.input, _ = SubtractRowVector(input, xCompressionMean)
 	xCompressionStandardDeviation := GetColumnStdDev(d.input, xCompressionMean)
 	d.input, _ = DivideColumnVector(d.input, xCompressionStandardDeviation)
 
 	yCompressionMean := GetColumnMean(output)
-	d.output, _ = SubtractColumnVector(output, yCompressionMean)
+	d.output, _ = SubtractRowVector(output, yCompressionMean)
 	yCompressionStandardDeviation := GetColumnStdDev(d.output, yCompressionMean)
 	d.output, _ = DivideColumnVector(d.output, yCompressionStandardDeviation)
 

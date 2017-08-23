@@ -52,13 +52,13 @@ func AddRowToMatrix(matrix, row *mat.Dense) (*mat.Dense, error) {
 	return mat.NewDense(matrixRows, matrixCols, result), nil
 }
 
-func AddColumnVector(x *mat.Dense, y *mat.VecDense) (*mat.Dense, error) {
+func AddRowVector(x *mat.Dense, y *mat.VecDense) (*mat.Dense, error) {
 	rows, cols := x.Dims()
 	results := []float64{}
-	for i := 0; i < cols; i++ {
-		column := x.ColView(i)
-		for j := 0; j <= rows; j++ {
-			results = append(results, column.At(0, j)-y.At(0, j))
+	for i := 0; i < rows; i++ {
+		row := x.RowView(i)
+		for j := 0; j <= cols-1; j++ {
+			results = append(results, row.At(j, 0)+y.At(j, 0))
 		}
 	}
 
@@ -78,24 +78,24 @@ func DivideColumnVector(x *mat.Dense, y *mat.VecDense) (*mat.Dense, error) {
 	return mat.NewDense(rows, cols, results), nil
 }
 
-func SubtractColumnVector(x *mat.Dense, y *mat.VecDense) (*mat.Dense, error) {
-	_, cols := y.Dims()
-	z := mat.NewVecDense(cols, nil)
+func SubtractRowVector(x *mat.Dense, y *mat.VecDense) (*mat.Dense, error) {
+	rows, _ := y.Dims()
+	z := mat.NewVecDense(rows, nil)
 	z.ScaleVec(-1, y)
-	return AddColumnVector(x, z)
+	return AddRowVector(x, z)
 }
 
 func GetColumnMean(x *mat.Dense) *mat.VecDense {
 	rows, cols := x.Dims()
 	colMeans := []float64{}
 	for i := 0; i < cols; i++ {
-		mean := 0.0
+		sum := 0.0
 		column := x.ColView(i)
-		for j := 0; j <= rows; j++ {
-			mean = mean + column.At(0, j)
+		for j := 0; j <= rows-1; j++ {
+			sum = sum + column.At(j, 0)
 		}
 
-		colMeans = append(colMeans, mean)
+		colMeans = append(colMeans, sum/float64(rows))
 	}
 
 	return mat.NewVecDense(cols, colMeans)
