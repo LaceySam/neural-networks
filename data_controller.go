@@ -6,9 +6,15 @@ import (
 	"gonum.org/v1/gonum/mat"
 )
 
+type Batch struct {
+	X *mat.Dense
+	Y *mat.Dense
+}
+
 type DataSet struct {
 	Input           [][]float64 `json:"input"`
 	Output          [][]float64 `json:"output"`
+	Batches         []Batch
 	currentLocation int
 	BatchSize       int
 	dataLength      int
@@ -28,9 +34,12 @@ func (d *DataSet) Setup(BatchSize int) {
 	d.dataLength = inLength
 	d.InputCount = len(d.Input[0])
 	d.OutputCount = len(d.Output[0])
+
 }
 
-func (d *DataSet) Compress() (float64, float64) {
+func (d *DataSet) Compress() (*mat.VecDense, *mat.VecDense) {
+
+	return nil, nil
 }
 
 func (d *DataSet) Reset() {

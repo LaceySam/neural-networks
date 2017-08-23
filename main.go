@@ -29,8 +29,8 @@ type NeuralNetwork struct {
 	InputCount                   int
 	OutputCount                  int
 	LossFunction                 LossFunction
-	CompressionMean              *mat.Dense
-	CompressionStandardDeviation *mat.Dense
+	CompressionMean              *mat.VecDense
+	CompressionStandardDeviation *mat.VecDense
 	BatchSize                    int
 	DataSet                      *DataSet
 }
