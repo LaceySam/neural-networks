@@ -143,8 +143,7 @@ func (nn *NeuralNetwork) LoadData(batchSize int, data []byte) error {
 		return err
 	}
 
-	nn.DataSet.Setup(batchSize)
-	nn.CompressionMean, nn.CompressionStandardDeviation = nn.DataSet.Compress()
+	nn.CompressionMean, nn.CompressionStandardDeviation = nn.DataSet.Setup(batchSize)
 	return nil
 }
 
@@ -158,7 +157,7 @@ func main() {
 
 	hiddenLayers := 4
 	hiddenLayerSize := 30
-	batchSize := 27
+	batchSize := 26
 	nn := NewNeuralNetwork(hiddenLayers, hiddenLayerSize, L2Loss)
 	nn.LoadData(batchSize, file)
 

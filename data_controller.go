@@ -7,14 +7,18 @@ import (
 )
 
 type Batch struct {
-	X *mat.Dense
-	Y *mat.Dense
+	X    *mat.Dense
+	Y    *mat.Dense
+	Size int
 }
 
 type DataSet struct {
 	Input           [][]float64 `json:"input"`
 	Output          [][]float64 `json:"output"`
+	input           *mat.Dense
+	output          *mat.Dense
 	Batches         []Batch
+	batchCount      int
 	currentLocation int
 	BatchSize       int
 	dataLength      int
@@ -22,7 +26,71 @@ type DataSet struct {
 	OutputCount     int
 }
 
-func (d *DataSet) Setup(BatchSize int) {
+func (d *DataSet) createBatches() (*mat.VecDense, *mat.VecDense) {
+	// Load data into a giant Matrix
+	Xvals := []float64{}
+	for i := 0; i < len(d.Input); i++ {
+		for j := 0; j < len(d.Input[i]); j++ {
+			Xvals = append(Xvals, d.Input[i][j])
+		}
+	}
+
+	input := mat.NewDense(len(d.Input), d.InputCount, Xvals)
+
+	Yvals := []float64{}
+	for i := 0; i < len(d.Output); i++ {
+		for j := 0; j < len(d.Output[i]); j++ {
+			Yvals = append(Yvals, d.Output[i][j])
+		}
+	}
+
+	output := mat.NewDense(len(d.Output), d.OutputCount, Yvals)
+
+	// Compress
+	xCompressionMean := GetColumnMean(input)
+	d.input, _ = SubtractColumnVector(input, xCompressionMean)
+	xCompressionStandardDeviation := GetColumnStdDev(d.input, xCompressionMean)
+	d.input, _ = DivideColumnVector(d.input, xCompressionStandardDeviation)
+
+	yCompressionMean := GetColumnMean(output)
+	d.output, _ = SubtractColumnVector(output, yCompressionMean)
+	yCompressionStandardDeviation := GetColumnStdDev(d.output, yCompressionMean)
+	d.output, _ = DivideColumnVector(d.output, yCompressionStandardDeviation)
+
+	// Now split big matrixes into batches
+	rows, xCols := d.input.Dims()
+	_, yCols := d.output.Dims()
+	batchNumber := 0
+	i := 0
+	k := 0
+	for k != rows {
+		i = batchNumber * d.BatchSize
+		k = (batchNumber + 1) * d.BatchSize
+		if k > rows {
+			k = rows
+		}
+
+		sX := d.input.Slice(i, k, 0, xCols)
+		sY := d.output.Slice(i, k, 0, yCols)
+
+		X := mat.NewDense(k-i, xCols, nil)
+		Y := mat.NewDense(k-i, yCols, nil)
+
+		X.Copy(sX)
+		Y.Copy(sY)
+
+		batch := Batch{X: X, Y: Y, Size: k - i}
+		d.Batches = append(d.Batches, batch)
+
+		batchNumber++
+	}
+
+	d.batchCount = len(d.Batches)
+
+	return yCompressionMean, yCompressionStandardDeviation
+}
+
+func (d *DataSet) Setup(BatchSize int) (*mat.VecDense, *mat.VecDense) {
 	inLength := len(d.Input)
 	outLength := len(d.Output)
 
@@ -34,11 +102,12 @@ func (d *DataSet) Setup(BatchSize int) {
 	d.dataLength = inLength
 	d.InputCount = len(d.Input[0])
 	d.OutputCount = len(d.Output[0])
+	d.Batches = []Batch{}
 
+	return d.createBatches()
 }
 
 func (d *DataSet) Compress() (*mat.VecDense, *mat.VecDense) {
-
 	return nil, nil
 }
 
@@ -47,30 +116,17 @@ func (d *DataSet) Reset() {
 }
 
 func (d *DataSet) Completed() bool {
-	return d.dataLength == d.currentLocation
+	return d.batchCount == d.currentLocation
 }
 
 func (d *DataSet) GetBatch() (*mat.Dense, *mat.Dense) {
-	stop := d.currentLocation + d.BatchSize
+	batch := d.Batches[d.currentLocation]
+	X := mat.NewDense(batch.Size, d.InputCount, nil)
+	y := mat.NewDense(batch.Size, d.OutputCount, nil)
 
-	XBatch := []float64{}
-	YBatch := []float64{}
-	for i := d.currentLocation; i < stop; i++ {
-		for j := 0; j < len(d.Input[i]); j++ {
-			XBatch = append(XBatch, d.Input[i][j])
-		}
+	X.Copy(batch.X)
+	y.Copy(batch.Y)
 
-		for j := 0; j < len(d.Output[i]); j++ {
-			YBatch = append(YBatch, d.Output[i][j])
-		}
-
-		if i >= d.dataLength-1 {
-			stop = d.dataLength
-			break
-		}
-	}
-
-	currentBatchSize := stop - d.currentLocation
-	d.currentLocation = stop
-	return mat.NewDense(currentBatchSize, d.InputCount, XBatch), mat.NewDense(currentBatchSize, d.OutputCount, YBatch)
+	d.currentLocation++
+	return X, y
 }

@@ -101,7 +101,7 @@ func GetColumnMean(x *mat.Dense) *mat.VecDense {
 	return mat.NewVecDense(cols, colMeans)
 }
 
-func CalculateColumnStdDev(x *mat.Dense, mean *mat.VecDense) *mat.VecDense {
+func GetColumnStdDev(x *mat.Dense, mean *mat.VecDense) *mat.VecDense {
 	rows, cols := x.Dims()
 	colStdDev := []float64{}
 	for i := 0; i < cols; i++ {
