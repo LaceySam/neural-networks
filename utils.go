@@ -68,10 +68,10 @@ func AddRowVector(x *mat.Dense, y *mat.VecDense) (*mat.Dense, error) {
 func DivideColumnVector(x *mat.Dense, y *mat.VecDense) (*mat.Dense, error) {
 	rows, cols := x.Dims()
 	results := []float64{}
-	for i := 0; i < cols; i++ {
-		column := x.ColView(i)
-		for j := 0; j <= rows; j++ {
-			results = append(results, column.At(0, j)/y.At(0, j))
+	for i := 0; i < rows; i++ {
+		row := x.RowView(i)
+		for j := 0; j <= cols-1; j++ {
+			results = append(results, row.At(j, 0)/y.At(j, 0))
 		}
 	}
 
@@ -107,11 +107,11 @@ func GetColumnStdDev(x *mat.Dense, mean *mat.VecDense) *mat.VecDense {
 	for i := 0; i < cols; i++ {
 		sum := 0.0
 		column := x.ColView(i)
-		for j := 0; j <= rows; j++ {
-			sum = sum + math.Pow(column.At(0, j)-mean.At(0, j), 2)
+		for j := 0; j <= rows-1; j++ {
+			sum = sum + math.Pow(column.At(i, 0)-mean.At(i, 0), 2)
 		}
 
-		stdDev := math.Sqrt(sum / (float64(rows) - 1.0))
+		stdDev := math.Sqrt(sum / float64(rows))
 		colStdDev = append(colStdDev, stdDev)
 	}
 

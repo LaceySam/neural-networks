@@ -24,7 +24,13 @@ func compareDense(x, y mat.Matrix) error {
 	for i := 0; i < xCols; i++ {
 		for j := 0; j < xRows; j++ {
 			if x.At(j, i) != y.At(j, i) {
-				return fmt.Errorf("Comparision fail at point (%d, %d)", i, j)
+				return fmt.Errorf(
+					"Comparision fail at point (%d, %d). X: %v, y: %v",
+					i,
+					j,
+					x,
+					y,
+				)
 			}
 		}
 	}
@@ -87,6 +93,48 @@ func TestSubtractColumnVector(t *testing.T) {
 	expectedResult := mat.NewDense(2, 2, []float64{0, -1, 0, -1})
 
 	gotResult, err := main.SubtractRowVector(matrix, columnVector)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = compareDense(expectedResult, gotResult)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetColumnStdDev(t *testing.T) {
+	matrix := mat.NewDense(4, 4, []float64{4, 2, 3, 5, 4, 2, 3, 5, -4, -2, -3, -5, -4, -2, -3, -5})
+	expectedStdDev := mat.NewVecDense(4, []float64{4, 2, 3, 5})
+
+	mean := main.GetColumnMean(matrix)
+	gotStdDev := main.GetColumnStdDev(matrix, mean)
+
+	err := compareDense(expectedStdDev, gotStdDev)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetColumnStdDevLobsided(t *testing.T) {
+	matrix := mat.NewDense(4, 2, []float64{4, 2, 4, 2, -4, -2, -4, -2})
+	expectedStdDev := mat.NewVecDense(2, []float64{4, 2})
+
+	mean := main.GetColumnMean(matrix)
+	gotStdDev := main.GetColumnStdDev(matrix, mean)
+
+	err := compareDense(expectedStdDev, gotStdDev)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestDivideColumnVectorLobsided(t *testing.T) {
+	matrix := mat.NewDense(4, 2, []float64{4, 2, 4, 2, -4, -2, -4, -2})
+	divisor := mat.NewVecDense(2, []float64{4, 2})
+	expectedResult := mat.NewDense(4, 2, []float64{1, 1, 1, 1, -1, -1, -1, -1})
+
+	gotResult, err := main.DivideColumnVector(matrix, divisor)
 	if err != nil {
 		t.Error(err)
 	}
