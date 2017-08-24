@@ -12,7 +12,7 @@ import (
 type Layer struct {
 	Weight             *mat.Dense
 	Bias               *mat.Dense
-	activationFunction ActivationFunction
+	ActivationFunction ActivationFunction
 	weightInitialiser  Initialiser
 	biasInitialiser    Initialiser
 }
@@ -76,7 +76,7 @@ func (
 	layer := &Layer{
 		Weight:             mat.NewDense(r, c, nil),
 		Bias:               mat.NewDense(1, c, nil),
-		activationFunction: activationFunction,
+		ActivationFunction: activationFunction,
 		weightInitialiser:  weightInitialiser,
 		biasInitialiser:    biasInitialiser,
 	}
@@ -104,6 +104,9 @@ func (nn *NeuralNetwork) Forward(X *mat.Dense) (*mat.Dense, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// Apply the layers activation function
+		X.Apply(nn.Layers[i].ActivationFunction, X)
 
 		r, c := X.Dims()
 		fmt.Printf("BATCH: ROWS: %d, COLS: %d\n", r, c)
@@ -161,7 +164,7 @@ func main() {
 	nn := NewNeuralNetwork(hiddenLayers, hiddenLayerSize, L2Loss)
 	nn.LoadData(batchSize, file)
 
-	o := NewOnes()
+	o := NewZeros()
 	for i := 0; i < hiddenLayers+2; i++ {
 		var g *GlorotNormal
 		if i == 0 {
