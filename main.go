@@ -157,7 +157,7 @@ func main() {
 
 	hiddenLayers := 4
 	hiddenLayerSize := 30
-	batchSize := 26
+	batchSize := 10
 	nn := NewNeuralNetwork(hiddenLayers, hiddenLayerSize, L2Loss)
 	nn.LoadData(batchSize, file)
 
