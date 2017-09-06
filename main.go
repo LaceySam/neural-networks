@@ -10,12 +10,12 @@ import (
 )
 
 type Layer struct {
-	Weight                         *mat.Dense
-	Bias                           *mat.Dense
-	ActivationFunction             ActivationFunction
-	DifferentialActivationFunction DifferentialActivationFunction
-	weightInitialiser              Initialiser
-	biasInitialiser                Initialiser
+	Weight                  *mat.Dense
+	Bias                    *mat.Dense
+	ActivationFunction      ActivationFunction
+	ActivationFunctionPrime ActivationFunctionPrime
+	weightInitialiser       Initialiser
+	biasInitialiser         Initialiser
 }
 
 func (l *Layer) Seed() {
@@ -56,7 +56,7 @@ func (
 	nn *NeuralNetwork,
 ) AddDenseLayer(
 	activationFunction ActivationFunction,
-	differentialActivationFunction DifferentialActivationFunction,
+	ActivationFunctionPrime ActivationFunctionPrime,
 	weightInitialiser Initialiser,
 	biasInitialiser Initialiser,
 ) bool {
@@ -79,12 +79,12 @@ func (
 	}
 
 	layer := &Layer{
-		Weight:                         mat.NewDense(r, c, nil),
-		Bias:                           mat.NewDense(1, c, nil),
-		ActivationFunction:             activationFunction,
-		DifferentialActivationFunction: differentialActivationFunction,
-		weightInitialiser:              weightInitialiser,
-		biasInitialiser:                biasInitialiser,
+		Weight:                  mat.NewDense(r, c, nil),
+		Bias:                    mat.NewDense(1, c, nil),
+		ActivationFunction:      activationFunction,
+		ActivationFunctionPrime: ActivationFunctionPrime,
+		weightInitialiser:       weightInitialiser,
+		biasInitialiser:         biasInitialiser,
 	}
 
 	layer.Seed()
@@ -128,28 +128,38 @@ func (nn *NeuralNetwork) Backward(Xsteps []*mat.Dense, y *mat.Dense) error {
 	cost.Sub(Xsteps[len(Xsteps)-1], y)
 	newWeights := []*mat.Dense{}
 
-	for i := len(nn.Layers) - 1; i > 0; i-- {
+	for i := len(nn.Layers) - 1; i >= 0; i-- {
 		activationDerivative := mat.DenseCopyOf(Xsteps[i+1])
-		activationDerivative.Apply(nn.Layers[i].DifferentialActivationFunction, activationDerivative)
+		activationDerivative.Apply(nn.Layers[i].ActivationFunctionPrime, activationDerivative)
 
-		delta, err := HadamardProduct(cost, activationDerivative)
+		backpropagationError, err := HadamardProduct(cost, activationDerivative)
 		if err != nil {
 			fmt.Println("hadam", err)
 		}
 
-		fmt.Println(delta.Dims())
-		fmt.Println(Xsteps[i].Dims())
-		fmt.Println("true dat")
-
-		weightChange, err := MultiplyMatrices(delta, Xsteps[i])
+		weightCost, err := MultiplyMatrices(Transpose(Xsteps[i]), backpropagationError)
 		if err != nil {
 			fmt.Println("mult", err)
 		}
 
-		fmt.Println(weightChange.Dims())
+		weightCost.Scale(nn.LearningRate, weightCost)
+
+		weightCost.Sub(weightCost, nn.Layers[i].Weight)
+
+		newWeights = append([]*mat.Dense{weightCost}, newWeights...)
+
+		cost, err = MultiplyMatrices(backpropagationError, Transpose(nn.Layers[i].Weight))
+		if err != nil {
+			fmt.Println("mult2", err)
+		}
+
 	}
 
-	fmt.Println(newWeights)
+	for i := len(nn.Layers) - 1; i > 0; i-- {
+		fmt.Println(len(nn.Layers), len(newWeights))
+		nn.Layers[i].Weight = newWeights[i]
+	}
+
 	return nil
 }
 
@@ -217,7 +227,7 @@ func main() {
 			g = NewGlorotNormal(hiddenLayerSize, hiddenLayerSize)
 		}
 
-		nn.AddDenseLayer(Relu, ReluDifferential, g, o)
+		nn.AddDenseLayer(Relu, ReluPrime, g, o)
 	}
 
 	nn.TrainEpochs(1)
