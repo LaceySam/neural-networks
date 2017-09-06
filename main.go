@@ -10,11 +10,12 @@ import (
 )
 
 type Layer struct {
-	Weight             *mat.Dense
-	Bias               *mat.Dense
-	ActivationFunction ActivationFunction
-	weightInitialiser  Initialiser
-	biasInitialiser    Initialiser
+	Weight                         *mat.Dense
+	Bias                           *mat.Dense
+	ActivationFunction             ActivationFunction
+	DifferentialActivationFunction DifferentialActivationFunction
+	weightInitialiser              Initialiser
+	biasInitialiser                Initialiser
 }
 
 func (l *Layer) Seed() {
@@ -33,18 +34,21 @@ type NeuralNetwork struct {
 	CompressionStandardDeviation *mat.VecDense
 	BatchSize                    int
 	DataSet                      *DataSet
+	LearningRate                 float64
 }
 
 func NewNeuralNetwork(
 	hiddenLayerCount int,
 	hiddenLayerSize int,
 	lossFunction LossFunction,
+	learningRate float64,
 ) *NeuralNetwork {
 	return &NeuralNetwork{
 		HiddenLayerCount: hiddenLayerCount,
 		HiddenLayerSize:  hiddenLayerSize,
 		Layers:           []*Layer{},
 		LossFunction:     lossFunction,
+		LearningRate:     learningRate,
 	}
 }
 
@@ -52,6 +56,7 @@ func (
 	nn *NeuralNetwork,
 ) AddDenseLayer(
 	activationFunction ActivationFunction,
+	differentialActivationFunction DifferentialActivationFunction,
 	weightInitialiser Initialiser,
 	biasInitialiser Initialiser,
 ) bool {
@@ -74,11 +79,12 @@ func (
 	}
 
 	layer := &Layer{
-		Weight:             mat.NewDense(r, c, nil),
-		Bias:               mat.NewDense(1, c, nil),
-		ActivationFunction: activationFunction,
-		weightInitialiser:  weightInitialiser,
-		biasInitialiser:    biasInitialiser,
+		Weight:                         mat.NewDense(r, c, nil),
+		Bias:                           mat.NewDense(1, c, nil),
+		ActivationFunction:             activationFunction,
+		DifferentialActivationFunction: differentialActivationFunction,
+		weightInitialiser:              weightInitialiser,
+		biasInitialiser:                biasInitialiser,
 	}
 
 	layer.Seed()
@@ -88,37 +94,72 @@ func (
 	return true
 }
 
-func (nn *NeuralNetwork) Forward(X *mat.Dense) (*mat.Dense, error) {
-
+func (nn *NeuralNetwork) Forward(X *mat.Dense) (*mat.Dense, []*mat.Dense, error) {
 	//var result *mat.Dense
 	var err error
+	Xsteps := []*mat.Dense{X}
 
 	for i := 0; i < len(nn.Layers); i++ {
 		layer := nn.Layers[i]
 		X, err = MultiplyMatrices(X, layer.Weight)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		X, err = AddRowToMatrix(X, layer.Bias)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// Apply the layers activation function
+		Xsteps = append(Xsteps, X)
 		X.Apply(nn.Layers[i].ActivationFunction, X)
 
 		r, c := X.Dims()
 		fmt.Printf("BATCH: ROWS: %d, COLS: %d\n", r, c)
 	}
 
-	return X, nil
+	return X, Xsteps, nil
+}
+
+func (nn *NeuralNetwork) Backward(Xsteps []*mat.Dense, y *mat.Dense) error {
+
+	cost := mat.DenseCopyOf(Xsteps[len(Xsteps)-1])
+	cost.Sub(Xsteps[len(Xsteps)-1], y)
+	newWeights := []*mat.Dense{}
+
+	for i := len(nn.Layers) - 1; i > 0; i-- {
+		activationDerivative := mat.DenseCopyOf(Xsteps[i+1])
+		activationDerivative.Apply(nn.Layers[i].DifferentialActivationFunction, activationDerivative)
+
+		delta, err := HadamardProduct(cost, activationDerivative)
+		if err != nil {
+			fmt.Println("hadam", err)
+		}
+
+		fmt.Println(delta.Dims())
+		fmt.Println(Xsteps[i].Dims())
+		fmt.Println("true dat")
+
+		weightChange, err := MultiplyMatrices(delta, Xsteps[i])
+		if err != nil {
+			fmt.Println("mult", err)
+		}
+
+		fmt.Println(weightChange.Dims())
+	}
+
+	fmt.Println(newWeights)
+	return nil
 }
 
 func (nn *NeuralNetwork) TrainBatch(X, y *mat.Dense) error {
-	X, _ = nn.Forward(X)
+	var Xsteps []*mat.Dense
+	X, Xsteps, _ = nn.Forward(X)
 	loss := nn.LossFunction(X, y)
 	fmt.Println("Loss", loss)
+
+	nn.Backward(Xsteps, y)
 
 	return nil
 }
@@ -161,7 +202,8 @@ func main() {
 	hiddenLayers := 4
 	hiddenLayerSize := 30
 	batchSize := 10
-	nn := NewNeuralNetwork(hiddenLayers, hiddenLayerSize, L2Loss)
+	learningRate := 0.01
+	nn := NewNeuralNetwork(hiddenLayers, hiddenLayerSize, L2Loss, learningRate)
 	nn.LoadData(batchSize, file)
 
 	o := NewZeros()
@@ -175,7 +217,7 @@ func main() {
 			g = NewGlorotNormal(hiddenLayerSize, hiddenLayerSize)
 		}
 
-		nn.AddDenseLayer(Relu, g, o)
+		nn.AddDenseLayer(Relu, ReluDifferential, g, o)
 	}
 
 	nn.TrainEpochs(1)

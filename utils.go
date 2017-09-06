@@ -117,3 +117,31 @@ func GetColumnStdDev(x *mat.Dense, mean *mat.VecDense) *mat.VecDense {
 
 	return mat.NewVecDense(cols, colStdDev)
 }
+
+func HadamardProduct(x, y *mat.Dense) (*mat.Dense, error) {
+	xRows, xCols := x.Dims()
+	yRows, yCols := y.Dims()
+
+	if xRows != yRows {
+		return nil, fmt.Errorf("Rows of matrices do not match: %d, %d", xRows, yRows)
+	}
+
+	if xCols != yCols {
+		return nil, fmt.Errorf("Columns of matrices do not match: %d, %d", xCols, yCols)
+	}
+
+	result := []float64{}
+	for i := 0; i < xRows; i++ {
+		for j := 0; j < yCols; j++ {
+			xVal := x.At(i, j)
+			yVal := y.At(i, j)
+			result = append(result, xVal*yVal)
+		}
+	}
+
+	return mat.NewDense(xRows, yCols, result), nil
+}
+
+func Transpose(x *mat.Dense) *mat.Dense {
+	return mat.DenseCopyOf(x.T())
+}
