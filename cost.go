@@ -14,8 +14,9 @@ func L2Loss(x, y *mat.Dense) *mat.VecDense {
 	for i := 0; i < rows; i++ {
 		squareSum := 0.0
 		row := x.RowView(i)
+		yRow := y.RowView(i)
 		for j := 0; j < cols; j++ {
-			squareSum = squareSum + math.Pow(row.At(j, 0), 2)
+			squareSum = squareSum + math.Pow(row.At(j, 0)-yRow.At(j, 0), 2)
 		}
 
 		vals = append(vals, squareSum/(float64(cols)*2.0))

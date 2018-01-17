@@ -144,3 +144,19 @@ func TestDivideColumnVectorLobsided(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestHadamardProduct(t *testing.T) {
+	a := mat.NewDense(1, 2, []float64{1, 2})
+	b := mat.NewDense(1, 2, []float64{3, 4})
+	expectedResult := mat.NewDense(1, 2, []float64{3, 8})
+
+	gotResult, err := main.HadamardProduct(a, b)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = compareDense(expectedResult, gotResult)
+	if err != nil {
+		t.Error(err)
+	}
+}

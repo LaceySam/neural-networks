@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
 	"gonum.org/v1/gonum/mat"
 )
@@ -95,25 +96,30 @@ func (
 }
 
 func (nn *NeuralNetwork) Forward(X *mat.Dense) (*mat.Dense, []*mat.Dense, error) {
-	//var result *mat.Dense
 	var err error
 	Xsteps := []*mat.Dense{X}
 
 	for i := 0; i < len(nn.Layers); i++ {
 		layer := nn.Layers[i]
 		X, err = MultiplyMatrices(X, layer.Weight)
+
+		if i == len(nn.Layers)-1 {
+			//fmt.Println(i, ":", layer.Weight)
+		}
 		if err != nil {
 			return nil, nil, err
 		}
 
-		X, err = AddRowToMatrix(X, layer.Bias)
-		if err != nil {
-			return nil, nil, err
+		if layer.Bias != nil {
+			X, err = AddRowToMatrix(X, layer.Bias)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 
 		// Apply the layers activation function
-		Xsteps = append(Xsteps, X)
 		X.Apply(nn.Layers[i].ActivationFunction, X)
+		Xsteps = append(Xsteps, X)
 
 		r, c := X.Dims()
 		fmt.Printf("BATCH: ROWS: %d, COLS: %d\n", r, c)
@@ -122,33 +128,37 @@ func (nn *NeuralNetwork) Forward(X *mat.Dense) (*mat.Dense, []*mat.Dense, error)
 	return X, Xsteps, nil
 }
 
-func (nn *NeuralNetwork) Backward(Xsteps []*mat.Dense, y *mat.Dense) error {
+func (nn *NeuralNetwork) Backward(Xsteps []*mat.Dense, X, y *mat.Dense) error {
 
 	cost := mat.DenseCopyOf(Xsteps[len(Xsteps)-1])
 	cost.Sub(Xsteps[len(Xsteps)-1], y)
 	newWeights := []*mat.Dense{}
 
 	for i := len(nn.Layers) - 1; i >= 0; i-- {
-		activationDerivative := mat.DenseCopyOf(Xsteps[i+1])
-		activationDerivative.Apply(nn.Layers[i].ActivationFunctionPrime, activationDerivative)
+		delta := mat.DenseCopyOf(Xsteps[i+1])
 
-		backpropagationError, err := HadamardProduct(cost, activationDerivative)
-		if err != nil {
-			fmt.Println("hadam", err)
-		}
+		fmt.Println(Xsteps[i+1])
+		fmt.Println("delta", 1, delta)
+		delta.Apply(nn.Layers[i].ActivationFunctionPrime, delta)
+		fmt.Println("delta", 2, delta, cost)
+		delta.MulElem(delta, cost)
+		fmt.Println("delta", 3, delta)
 
-		weightCost, err := MultiplyMatrices(Transpose(Xsteps[i]), backpropagationError)
+		weightCost, err := MultiplyMatrices(Transpose(Xsteps[i]), delta)
 		if err != nil {
 			fmt.Println("mult", err)
 		}
 
+		if i == len(nn.Layers)-1 {
+			//fmt.Println(nn.Layers[i].Weight)
+			//fmt.Println(weightCost)
+		}
 		weightCost.Scale(nn.LearningRate, weightCost)
-
-		weightCost.Sub(weightCost, nn.Layers[i].Weight)
+		weightCost.Sub(nn.Layers[i].Weight, weightCost)
 
 		newWeights = append([]*mat.Dense{weightCost}, newWeights...)
 
-		cost, err = MultiplyMatrices(backpropagationError, Transpose(nn.Layers[i].Weight))
+		cost, err = MultiplyMatrices(delta, Transpose(nn.Layers[i].Weight))
 		if err != nil {
 			fmt.Println("mult2", err)
 		}
@@ -156,7 +166,9 @@ func (nn *NeuralNetwork) Backward(Xsteps []*mat.Dense, y *mat.Dense) error {
 	}
 
 	for i := len(nn.Layers) - 1; i > 0; i-- {
-		fmt.Println(len(nn.Layers), len(newWeights))
+		if i == len(nn.Layers)-1 {
+			//fmt.Println("NEW", i, ":", newWeights[i])
+		}
 		nn.Layers[i].Weight = newWeights[i]
 	}
 
@@ -168,8 +180,10 @@ func (nn *NeuralNetwork) TrainBatch(X, y *mat.Dense) error {
 	X, Xsteps, _ = nn.Forward(X)
 	loss := nn.LossFunction(X, y)
 	fmt.Println("Loss", loss)
+	count, _ := loss.Dims()
+	fmt.Println("Mean loss", mat.Sum(loss)/float64(count))
 
-	nn.Backward(Xsteps, y)
+	nn.Backward(Xsteps, X, y)
 
 	return nil
 }
@@ -177,6 +191,9 @@ func (nn *NeuralNetwork) TrainBatch(X, y *mat.Dense) error {
 func (nn *NeuralNetwork) TrainEpochs(epochs int) error {
 
 	for i := 0; i < epochs; i++ {
+		fmt.Printf("Epoch %d, Completed: %v\n\n\n\n\n\n", i, nn.DataSet.Completed())
+
+		z := 0
 		for !nn.DataSet.Completed() {
 			X, y := nn.DataSet.GetBatch()
 
@@ -184,7 +201,13 @@ func (nn *NeuralNetwork) TrainEpochs(epochs int) error {
 			if err != nil {
 				return err
 			}
+
+			z++
 		}
+
+		time.Sleep(time.Second)
+		nn.DataSet.Reset()
+
 	}
 
 	return nil
@@ -209,10 +232,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	hiddenLayers := 4
-	hiddenLayerSize := 30
-	batchSize := 10
-	learningRate := 0.01
+	hiddenLayers := 1
+	hiddenLayerSize := 3
+	batchSize := 1
+	learningRate := 0.1
 	nn := NewNeuralNetwork(hiddenLayers, hiddenLayerSize, L2Loss, learningRate)
 	nn.LoadData(batchSize, file)
 
@@ -230,5 +253,5 @@ func main() {
 		nn.AddDenseLayer(Relu, ReluPrime, g, o)
 	}
 
-	nn.TrainEpochs(1)
+	nn.TrainEpochs(2)
 }
