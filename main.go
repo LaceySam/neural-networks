@@ -101,11 +101,8 @@ func (nn *NeuralNetwork) Forward(X *mat.Dense) (*mat.Dense, []*mat.Dense, error)
 
 	for i := 0; i < len(nn.Layers); i++ {
 		layer := nn.Layers[i]
-		X, err = MultiplyMatrices(X, layer.Weight)
 
-		if i == len(nn.Layers)-1 {
-			//fmt.Println(i, ":", layer.Weight)
-		}
+		X, err = MultiplyMatrices(X, layer.Weight)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -132,27 +129,21 @@ func (nn *NeuralNetwork) Backward(Xsteps []*mat.Dense, X, y *mat.Dense) error {
 
 	cost := mat.DenseCopyOf(Xsteps[len(Xsteps)-1])
 	cost.Sub(Xsteps[len(Xsteps)-1], y)
+
+	// Need differential error
 	newWeights := []*mat.Dense{}
 
 	for i := len(nn.Layers) - 1; i >= 0; i-- {
 		delta := mat.DenseCopyOf(Xsteps[i+1])
 
-		fmt.Println(Xsteps[i+1])
-		fmt.Println("delta", 1, delta)
 		delta.Apply(nn.Layers[i].ActivationFunctionPrime, delta)
-		fmt.Println("delta", 2, delta, cost)
 		delta.MulElem(delta, cost)
-		fmt.Println("delta", 3, delta)
 
 		weightCost, err := MultiplyMatrices(Transpose(Xsteps[i]), delta)
 		if err != nil {
 			fmt.Println("mult", err)
 		}
 
-		if i == len(nn.Layers)-1 {
-			//fmt.Println(nn.Layers[i].Weight)
-			//fmt.Println(weightCost)
-		}
 		weightCost.Scale(nn.LearningRate, weightCost)
 		weightCost.Sub(nn.Layers[i].Weight, weightCost)
 

@@ -36,23 +36,38 @@ func TestBackWardPropagation(t *testing.T) {
 
 	hiddenLayers := 2
 	hiddenLayerSize := 3
-	learningRate := 1
+	learningRate := 1.0
 	nn := main.NewNeuralNetwork(hiddenLayers, hiddenLayerSize, main.L2Loss, learningRate)
 
 	nn.OutputCount = 3
 
 	nn.Layers = []*main.Layer{
 		&main.Layer{
-			Weight:             mat.NewDense(3, 3, []float64{0.1, 0.2, 0.3, 0.3, 0.2, 0.7, 0.4, 0.3, 0.9}),
+			Weight:             mat.NewDense(3, 3, []float64{0.1, 0.4, 0.3, 0.3, 0.7, 0.7, 0.5, 0.2, 0.9}),
+			Bias:               mat.NewDense(1, 3, []float64{1.0, 1.0, 1.0}),
 			ActivationFunction: main.Relu,
 		},
 		&main.Layer{
 			Weight:             mat.NewDense(3, 3, []float64{0.2, 0.3, 0.5, 0.3, 0.5, 0.7, 0.6, 0.4, 0.8}),
-			ActivationFunction: main.Relu,
+			Bias:               mat.NewDense(1, 3, []float64{1.0, 1.0, 1.0}),
+			ActivationFunction: main.Sigmoid,
 		},
 		&main.Layer{
 			Weight:             mat.NewDense(3, 3, []float64{0.1, 0.4, 0.8, 0.3, 0.7, 0.2, 0.5, 0.2, 0.9}),
+			Bias:               mat.NewDense(1, 3, []float64{1.0, 1.0, 1.0}),
 			ActivationFunction: main.Relu,
 		},
 	}
+
+	expectedResult1 := mat.NewDense(1, 3, []float64{1.87, 2.23, 2.83})
+
+	inp := mat.NewDense(1, 3, []float64{0.1, 0.2, 0.7})
+
+	gotResult, _, _ := nn.Forward(inp)
+	err := compareDense(expectedResult1, gotResult)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
 }

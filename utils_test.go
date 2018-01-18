@@ -9,6 +9,9 @@ import (
 	"neural-networks"
 )
 
+func round(x, unit float64) float64 {
+	return float64(int64(x/unit+0.5)) * unit
+}
 func compareDense(x, y mat.Matrix) error {
 	xRows, xCols := x.Dims()
 	yRows, yCols := y.Dims()
@@ -23,7 +26,7 @@ func compareDense(x, y mat.Matrix) error {
 
 	for i := 0; i < xCols; i++ {
 		for j := 0; j < xRows; j++ {
-			if x.At(j, i) != y.At(j, i) {
+			if round(x.At(j, i), 0.05) != round(y.At(j, i), 0.05) {
 				return fmt.Errorf(
 					"Comparision fail at point (%d, %d). X: %v, y: %v",
 					i,
